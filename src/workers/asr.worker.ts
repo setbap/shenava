@@ -23,6 +23,7 @@ let melFilters: MelBank | null = null
 let busy = false
 let queued: { id: number; pcm: Float32Array; captions: boolean } | null = null
 let cancelId: number | null = null
+let initInFlight = false
 
 function post(msg: WorkerResponse): void {
   self.postMessage(msg)
@@ -139,30 +140,42 @@ function configureOrt(): void {
   ort.env.wasm.numThreads = self.crossOriginIsolated ? 4 : 1
 }
 
+function timeout(ms: number, message: string): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), ms)
+  })
+}
+
 async function createSession(
   model: Uint8Array,
 ): Promise<{ session: ort.InferenceSession; backend: AsrBackend }> {
   configureOrt()
-  post({ type: 'progress', phase: 'compile', percent: 0 })
+
+  let heartbeat = 8
+  const beat = setInterval(() => {
+    heartbeat = Math.min(88, heartbeat + 4)
+    post({ type: 'progress', phase: 'compile', percent: heartbeat })
+  }, 1500)
 
   try {
-    const created = await ort.InferenceSession.create(model, {
-      executionProviders: ['webgpu', 'wasm'],
-    })
-    post({ type: 'progress', phase: 'compile', percent: 100 })
-    return { session: created, backend: 'webgpu' }
-  } catch (webgpuErr) {
+    post({ type: 'progress', phase: 'compile', percent: 5 })
     try {
+      const created = await Promise.race([
+        ort.InferenceSession.create(model, { executionProviders: ['webgpu'] }),
+        timeout(20_000, 'WebGPU timeout'),
+      ])
+      post({ type: 'progress', phase: 'compile', percent: 100 })
+      return { session: created, backend: 'webgpu' }
+    } catch {
+      post({ type: 'progress', phase: 'compile', percent: 20 })
       const created = await ort.InferenceSession.create(model, {
         executionProviders: ['wasm'],
       })
       post({ type: 'progress', phase: 'compile', percent: 100 })
       return { session: created, backend: 'wasm' }
-    } catch (wasmErr) {
-      const first = webgpuErr instanceof Error ? webgpuErr.message : String(webgpuErr)
-      const second = wasmErr instanceof Error ? wasmErr.message : String(wasmErr)
-      throw new Error(first === second ? first : `${first} / ${second}`)
     }
+  } finally {
+    clearInterval(beat)
   }
 }
 
@@ -311,7 +324,11 @@ async function init(): Promise<void> {
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const msg = event.data
   if (msg.type === 'init') {
-    void init()
+    if (session || initInFlight) return
+    initInFlight = true
+    void init().finally(() => {
+      initInFlight = false
+    })
     return
   }
   if (msg.type === 'cancel') {

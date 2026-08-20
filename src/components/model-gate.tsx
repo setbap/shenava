@@ -17,12 +17,10 @@ function formatMegabytes(bytes: number): string {
 export function ModelGate({
   load,
   downloadBytes,
-  prompted,
   onDownload,
 }: {
   load: LoadState
   downloadBytes: { loaded: number; total: number } | null
-  prompted: boolean
   onDownload: () => void
 }) {
   if (load.status === 'ready') return null
@@ -44,12 +42,12 @@ export function ModelGate({
         aria-labelledby="model-setup-title"
         className="flex w-full max-w-md flex-col gap-4 rounded-xl bg-popover p-6 text-popover-foreground ring-1 ring-foreground/10"
       >
-        {load.status === 'checking' || (load.status === 'loading' && !prompted) ? (
+        {load.status === 'checking' ? (
           <>
             <h1 id="model-setup-title" className="font-heading text-lg font-medium">
               شنوا کوچیک
             </h1>
-            <p className="leading-7 text-muted-foreground">یک لحظه، داره آماده می‌شه…</p>
+            <p className="leading-7 text-muted-foreground">یک لحظه…</p>
           </>
         ) : null}
 
@@ -70,14 +68,14 @@ export function ModelGate({
           </>
         ) : null}
 
-        {load.status === 'loading' && prompted ? (
+        {load.status === 'loading' ? (
           <>
             <h1 id="model-setup-title" className="font-heading text-lg font-medium">
               {load.phase === 'compile' ? 'داره آماده می‌شه' : 'داره دانلود می‌شه'}
             </h1>
             <p className="text-pretty leading-8 text-muted-foreground">
               {load.phase === 'compile'
-                ? 'چند لحظه دیگه موتور روی دستگاهت بالا میاد.'
+                ? 'داره روی دستگاهت سوار می‌شه. این مرحله گاهی تا یک دقیقه طول می‌کشه، نگران نباش.'
                 : 'یه کم طول می‌کشه، ولی فقط همین یه‌باره. حدود ۲۲۰ مگ حجمشه.'}
             </p>
             <div className="flex w-full flex-col gap-2">

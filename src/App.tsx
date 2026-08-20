@@ -103,8 +103,6 @@ function AppShell() {
   const transcribingRef = useRef(false)
   const mediaObjectUrl = useRef<string | null>(null)
 
-  const initStarted = useRef(false)
-  const [prompted, setPrompted] = useState(false)
   const [load, setLoad] = useState<LoadState>({ status: 'checking' })
   const [downloadBytes, setDownloadBytes] = useState<{ loaded: number; total: number } | null>(
     null,
@@ -130,10 +128,7 @@ function AppShell() {
     setMediaUrl(url)
   }, [])
 
-  const startModelLoad = useCallback((fromPrompt = false) => {
-    if (initStarted.current) return
-    initStarted.current = true
-    if (fromPrompt) setPrompted(true)
+  const startModelLoad = useCallback(() => {
     setLoad({ status: 'loading', phase: 'download', percent: 0 })
     clientRef.current?.init()
   }, [])
@@ -156,7 +151,6 @@ function AppShell() {
       void requestPersistentStorage()
     }
     client.onError = (message) => {
-      initStarted.current = false
       setLoad({ status: 'error', message })
     }
     let cancelled = false
@@ -521,8 +515,7 @@ function AppShell() {
       <ModelGate
         load={load}
         downloadBytes={downloadBytes}
-        prompted={prompted}
-        onDownload={() => startModelLoad(true)}
+        onDownload={startModelLoad}
       />
     </>
     )
@@ -567,8 +560,7 @@ function AppShell() {
     <ModelGate
       load={load}
       downloadBytes={downloadBytes}
-      prompted={prompted}
-      onDownload={() => startModelLoad(true)}
+      onDownload={startModelLoad}
     />
     </>
   )
