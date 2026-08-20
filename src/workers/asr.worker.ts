@@ -23,7 +23,7 @@ let melFilters: MelBank | null = null
 let busy = false
 let queued: { id: number; pcm: Float32Array; captions: boolean } | null = null
 let cancelId: number | null = null
-let initInFlight = false
+let initStarted = false
 
 function post(msg: WorkerResponse): void {
   self.postMessage(msg)
@@ -142,25 +142,28 @@ function configureOrt(): void {
 
 async function createSession(
   model: Uint8Array,
-  wasmOnly: boolean,
 ): Promise<{ session: ort.InferenceSession; backend: AsrBackend }> {
   configureOrt()
-
-  let heartbeat = 8
-  const beat = setInterval(() => {
-    heartbeat = Math.min(88, heartbeat + 4)
-    post({ type: 'progress', phase: 'compile', percent: heartbeat })
-  }, 1500)
+  post({ type: 'progress', phase: 'compile', percent: 0 })
 
   try {
-    post({ type: 'progress', phase: 'compile', percent: wasmOnly ? 20 : 5 })
     const created = await ort.InferenceSession.create(model, {
-      executionProviders: wasmOnly ? ['wasm'] : ['webgpu', 'wasm'],
+      executionProviders: ['webgpu', 'wasm'],
     })
     post({ type: 'progress', phase: 'compile', percent: 100 })
-    return { session: created, backend: wasmOnly ? 'wasm' : 'webgpu' }
-  } finally {
-    clearInterval(beat)
+    return { session: created, backend: 'webgpu' }
+  } catch (webgpuErr) {
+    try {
+      const created = await ort.InferenceSession.create(model, {
+        executionProviders: ['wasm'],
+      })
+      post({ type: 'progress', phase: 'compile', percent: 100 })
+      return { session: created, backend: 'wasm' }
+    } catch (wasmErr) {
+      const first = webgpuErr instanceof Error ? webgpuErr.message : String(webgpuErr)
+      const second = wasmErr instanceof Error ? wasmErr.message : String(wasmErr)
+      throw new Error(first === second ? first : `${first} / ${second}`)
+    }
   }
 }
 
@@ -286,7 +289,7 @@ async function runQueued(): Promise<void> {
   }
 }
 
-async function init(wasmOnly: boolean): Promise<void> {
+async function init(): Promise<void> {
   try {
     const [tok, mel, model] = await Promise.all([
       fetchJson<TokenTable>(MODEL_FILES.tokens),
@@ -295,10 +298,11 @@ async function init(wasmOnly: boolean): Promise<void> {
     ])
     tokens = tok
     melFilters = mel
-    const created = await createSession(model.bytes, wasmOnly)
+    const created = await createSession(model.bytes)
     session = created.session
     post({ type: 'ready', backend: created.backend, source: model.source })
   } catch (err) {
+    initStarted = false
     post({
       type: 'error',
       message: err instanceof Error ? err.message : String(err),
@@ -309,11 +313,9 @@ async function init(wasmOnly: boolean): Promise<void> {
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const msg = event.data
   if (msg.type === 'init') {
-    if (session || initInFlight) return
-    initInFlight = true
-    void init(Boolean(msg.wasmOnly)).finally(() => {
-      initInFlight = false
-    })
+    if (initStarted) return
+    initStarted = true
+    void init()
     return
   }
   if (msg.type === 'cancel') {

@@ -79,16 +79,27 @@ export function ModelGate({
                 : 'یه کم طول می‌کشه، ولی فقط همین یه‌باره. حدود ۲۲۰ مگ حجمشه.'}
             </p>
             <div className="flex w-full flex-col gap-2">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{downloaded ?? (load.phase === 'compile' ? 'آماده‌سازی' : 'دانلود مدل')}</span>
-                <span className="tabular-nums">{formatFaNumber(Math.round(percent))}٪</span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-200"
-                  style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-                />
-              </div>
+              {load.phase === 'download' ? (
+                <>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{downloaded ?? 'دانلود مدل'}</span>
+                    <span className="tabular-nums">{formatFaNumber(Math.round(percent))}٪</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width] duration-200"
+                      style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm text-muted-foreground">آماده‌سازی موتور</span>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full w-full animate-pulse rounded-full bg-primary/80" />
+                  </div>
+                </>
+              )}
             </div>
           </>
         ) : null}

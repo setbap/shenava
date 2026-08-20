@@ -4,7 +4,7 @@ export type AsrBackend = 'webgpu' | 'wasm'
 export type ModelSource = 'local' | 'cache' | 'hub'
 
 export type WorkerRequest =
-  | { type: 'init'; wasmOnly?: boolean }
+  | { type: 'init' }
   | { type: 'transcribe'; id: number; pcm: Float32Array; captions?: boolean }
   | { type: 'cancel'; id: number }
 
