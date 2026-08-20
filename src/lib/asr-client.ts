@@ -25,30 +25,31 @@ type Pending = {
   onCaptionProgress?: (info: CaptionProgress) => void
 }
 
+const WEBGPU_COMPILE_MS = 90_000
+const WASM_COMPILE_MS = 180_000
+
 export class AsrClient {
   private worker: Worker
   private nextId = 1
   private pending = new Map<number, Pending>()
+  private backend: AsrBackend = 'webgpu'
+  private phase: ProgressInfo['phase'] | null = null
+  private compileTimer: ReturnType<typeof setTimeout> | null = null
+  private wasmFallbackUsed = false
 
   onProgress: ((info: ProgressInfo) => void) | null = null
   onReady: ((backend: AsrBackend, source: ModelSource) => void) | null = null
   onError: ((message: string) => void) | null = null
 
   constructor() {
-    this.worker = new Worker(new URL('../workers/asr.worker.ts', import.meta.url), {
-      type: 'module',
-    })
-    this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      this.handle(event.data)
-    }
-    this.worker.onerror = (event) => {
-      this.onError?.(event.message || 'Worker failed')
-    }
+    this.worker = this.spawn()
   }
 
   init(): void {
-    const msg: WorkerRequest = { type: 'init' }
-    this.worker.postMessage(msg)
+    this.backend = 'webgpu'
+    this.phase = null
+    this.wasmFallbackUsed = false
+    this.postInit()
   }
 
   transcribe(pcm: Float32Array): Promise<string> {
@@ -80,6 +81,7 @@ export class AsrClient {
   }
 
   dispose(): void {
+    this.clearCompileTimer()
     for (const [, pending] of this.pending) {
       pending.reject(new Error('ASR client disposed'))
     }
@@ -87,8 +89,70 @@ export class AsrClient {
     this.worker.terminate()
   }
 
+  private spawn(): Worker {
+    const worker = new Worker(new URL('../workers/asr.worker.ts', import.meta.url), {
+      type: 'module',
+    })
+    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      this.handle(event.data)
+    }
+    worker.onerror = (event) => {
+      this.fail(event.message || 'Worker failed')
+    }
+    return worker
+  }
+
+  private postInit(): void {
+    this.clearCompileTimer()
+    const msg: WorkerRequest = { type: 'init', backend: this.backend }
+    this.worker.postMessage(msg)
+  }
+
+  private armCompileTimer(): void {
+    this.clearCompileTimer()
+    const ms = this.backend === 'webgpu' ? WEBGPU_COMPILE_MS : WASM_COMPILE_MS
+    this.compileTimer = setTimeout(() => {
+      this.fail(
+        this.backend === 'webgpu'
+          ? 'WebGPU session create timed out'
+          : 'آماده‌سازی موتور خیلی طول کشید. صفحه را یک‌بار رفرش کن.',
+      )
+    }, ms)
+  }
+
+  private clearCompileTimer(): void {
+    if (this.compileTimer !== null) {
+      clearTimeout(this.compileTimer)
+      this.compileTimer = null
+    }
+  }
+
+  private fallbackWasm(reason: string): void {
+    console.warn('[asr]', reason, '— retrying with WASM')
+    this.wasmFallbackUsed = true
+    this.backend = 'wasm'
+    this.phase = 'compile'
+    this.clearCompileTimer()
+    this.worker.terminate()
+    this.worker = this.spawn()
+    this.onProgress?.({ phase: 'compile', percent: 5 })
+    this.postInit()
+  }
+
+  private fail(message: string): void {
+    if (!this.wasmFallbackUsed && this.phase !== 'download') {
+      this.fallbackWasm(message)
+      return
+    }
+    this.clearCompileTimer()
+    this.onError?.(message)
+  }
+
   private handle(msg: WorkerResponse): void {
     if (msg.type === 'progress') {
+      this.phase = msg.phase
+      if (msg.phase === 'compile') this.armCompileTimer()
+      else this.clearCompileTimer()
       this.onProgress?.({
         phase: msg.phase,
         loaded: msg.loaded,
@@ -98,6 +162,7 @@ export class AsrClient {
       return
     }
     if (msg.type === 'ready') {
+      this.clearCompileTimer()
       this.onReady?.(msg.backend, msg.source)
       return
     }
@@ -120,7 +185,7 @@ export class AsrClient {
         this.pending.delete(msg.id)
         return
       }
-      this.onError?.(msg.message)
+      this.fail(msg.message)
     }
   }
 }

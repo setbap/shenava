@@ -17,10 +17,6 @@ const isolation = {
 const ORT_FILES = [
   'ort-wasm-simd-threaded.asyncify.wasm',
   'ort-wasm-simd-threaded.asyncify.mjs',
-  'ort-wasm-simd-threaded.wasm',
-  'ort-wasm-simd-threaded.mjs',
-  'ort-wasm-simd-threaded.jsep.wasm',
-  'ort-wasm-simd-threaded.jsep.mjs',
 ]
 
 function copyOrtWasm(): Plugin {
@@ -107,7 +103,12 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,svg,png,woff2,wasm,mjs,json}'],
         maximumFileSizeToCacheInBytes: 40 * 1024 * 1024,
         navigateFallback: '/index.html',
-        globIgnores: ['**/models/*.onnx', '**/models/*.onnx.data'],
+        globIgnores: [
+          '**/models/*.onnx',
+          '**/models/*.onnx.data',
+          '**/*.wasm',
+        ],
+        navigateFallbackDenylist: [/^\/ort\//, /^\/models\//, /\.wasm$/i],
         runtimeCaching: [
           {
             urlPattern: /\/models\/.*\.(?:onnx|json)$/,
@@ -156,6 +157,9 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+  },
+  build: {
+    assetsInlineLimit: 0,
   },
   optimizeDeps: {
     exclude: ['onnxruntime-web'],

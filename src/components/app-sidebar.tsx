@@ -1,14 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
+  AudioLinesIcon,
   ChevronDownIcon,
   ExternalLinkIcon,
   FileIcon,
+  InfoIcon,
   MicIcon,
   PencilIcon,
   SearchIcon,
   Trash2Icon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,15 +82,7 @@ export function AppSidebar({
       <div className="flex flex-col gap-4 p-3 pb-4">
         <div className="flex items-center gap-2 px-1">
           <h1 className="text-2xl font-semibold tracking-tight text-primary">شنوا کوچیک</h1>
-          <a
-            href="https://huggingface.co/Reza2kn/Shenava-Koochik-v1.0"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <ExternalLinkIcon className="size-4" />
-            <span className="sr-only">مدل در هاگینگ‌فیس</span>
-          </a>
+          <AboutDialog />
         </div>
         <Button type="button" className="w-full bg-foreground text-background hover:bg-foreground/80" onClick={onNewVoice}>
           یادداشت جدید
@@ -248,6 +250,90 @@ export function AppSidebar({
         </label>
       </div>
     </div>
+  )
+}
+
+const HF_MODEL_URL = 'https://huggingface.co/Reza2kn/Shenava-Koochik-v1.0'
+const GITHUB_URL = 'https://github.com/setbap/shenava'
+
+function AboutDialog() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          <InfoIcon className="size-4" />
+          <span className="sr-only">درباره و منابع</span>
+        </button>
+      </DialogTrigger>
+      <DialogContent className="gap-5 sm:max-w-md" dir="rtl">
+        <DialogHeader className="gap-3 pe-8">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+            <InfoIcon className="size-5" />
+          </div>
+          <DialogTitle className="text-lg">درباره شنوا کوچیک</DialogTitle>
+          <DialogDescription className="text-pretty leading-7">
+            یه اپ یادداشت‌برداری ساده که به‌جای این‌که تایپ کنی، صدا ضبط می‌کنی یا فایل می‌فرستی.
+            همهٔ کارها تو مرورگر خودت انجام می‌شه (با مدل شنوا کوچیک) و صدا به هیچ جایی
+            آپلود نمی‌شه :)
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <AboutLink
+            href={HF_MODEL_URL}
+            icon={<AudioLinesIcon className="size-5" />}
+            title="مدل شنوا کوچیک"
+            hint="صفحه مدل روی هاگینگ‌فیس"
+          />
+          <AboutLink
+            href={GITHUB_URL}
+            icon={<GitHubMark className="size-5" />}
+            title="کد پروژه"
+            hint="مخزن گیت‌هاب"
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function GitHubMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.56 9.56 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z" />
+    </svg>
+  )
+}
+
+function AboutLink({
+  href,
+  icon,
+  title,
+  hint,
+}: {
+  href: string
+  icon: ReactNode
+  title: string
+  hint: string
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="group flex items-center gap-3 rounded-xl bg-muted/50 p-3 ring-1 ring-foreground/8 transition-colors hover:bg-muted hover:ring-foreground/15"
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-foreground ring-1 ring-foreground/10">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1 text-start">
+        <span className="block font-medium text-foreground">{title}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{hint}</span>
+      </span>
+      <ExternalLinkIcon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+    </a>
   )
 }
 

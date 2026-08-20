@@ -134,37 +134,60 @@ async function loadOnnxBytes(): Promise<{ bytes: Uint8Array; source: ModelSource
   return { bytes: new Uint8Array(buffer), source: 'hub' }
 }
 
+const ORT_DIR = new URL('/ort/', self.location.origin)
+
 function configureOrt(): void {
+  // onnxruntime-web/webgpu always boots the asyncify WASM runtime, even for
+  // WebGPU. Vite bundles the worker, so import.meta.url inside ORT does not
+  // point at these files unless we set an origin-absolute prefix.
+  ort.env.wasm.wasmPaths = {
+    mjs: new URL('ort-wasm-simd-threaded.asyncify.mjs', ORT_DIR).href,
+    wasm: new URL('ort-wasm-simd-threaded.asyncify.wasm', ORT_DIR).href,
+  }
   ort.env.wasm.simd = true
   ort.env.wasm.proxy = false
-  ort.env.wasm.numThreads = self.crossOriginIsolated ? 4 : 1
+  // Threads > 1 hang session.create in a Vite worker when pthread clones
+  // cannot load the same .mjs. WebGPU does not need WASM threads.
+  ort.env.wasm.numThreads = 1
+  ort.env.wasm.initTimeout = 30_000
+}
+
+function hasWebGpu(): boolean {
+  return typeof (self.navigator as Navigator & { gpu?: unknown }).gpu !== 'undefined'
 }
 
 async function createSession(
   model: Uint8Array,
+  backend: AsrBackend,
 ): Promise<{ session: ort.InferenceSession; backend: AsrBackend }> {
   configureOrt()
   post({ type: 'progress', phase: 'compile', percent: 0 })
 
-  try {
-    const created = await ort.InferenceSession.create(model, {
-      executionProviders: ['webgpu', 'wasm'],
+  const bytes = model.byteOffset === 0 ? model : model.slice()
+  const runtimeUrl = new URL('ort-wasm-simd-threaded.asyncify.mjs', ORT_DIR).href
+  const runtime = await fetch(runtimeUrl)
+  if (!runtime.ok) {
+    throw new Error(`ONNX runtime missing (${runtime.status})`)
+  }
+  const runtimeType = runtime.headers.get('content-type') ?? ''
+  if (runtimeType.includes('text/html')) {
+    throw new Error('ONNX runtime URL returned HTML instead of JavaScript')
+  }
+
+  if (backend === 'webgpu') {
+    if (!hasWebGpu()) throw new Error('WebGPU is not available in this worker')
+    const created = await ort.InferenceSession.create(bytes, {
+      executionProviders: ['webgpu'],
     })
     post({ type: 'progress', phase: 'compile', percent: 100 })
     return { session: created, backend: 'webgpu' }
-  } catch (webgpuErr) {
-    try {
-      const created = await ort.InferenceSession.create(model, {
-        executionProviders: ['wasm'],
-      })
-      post({ type: 'progress', phase: 'compile', percent: 100 })
-      return { session: created, backend: 'wasm' }
-    } catch (wasmErr) {
-      const first = webgpuErr instanceof Error ? webgpuErr.message : String(webgpuErr)
-      const second = wasmErr instanceof Error ? wasmErr.message : String(wasmErr)
-      throw new Error(first === second ? first : `${first} / ${second}`)
-    }
   }
+
+  const created = await ort.InferenceSession.create(bytes, {
+    executionProviders: ['wasm'],
+  })
+  post({ type: 'progress', phase: 'compile', percent: 100 })
+  return { session: created, backend: 'wasm' }
 }
 
 function encodedLengthOf(data: unknown): number {
@@ -289,7 +312,7 @@ async function runQueued(): Promise<void> {
   }
 }
 
-async function init(): Promise<void> {
+async function init(backend: AsrBackend): Promise<void> {
   try {
     const [tok, mel, model] = await Promise.all([
       fetchJson<TokenTable>(MODEL_FILES.tokens),
@@ -298,7 +321,7 @@ async function init(): Promise<void> {
     ])
     tokens = tok
     melFilters = mel
-    const created = await createSession(model.bytes)
+    const created = await createSession(model.bytes, backend)
     session = created.session
     post({ type: 'ready', backend: created.backend, source: model.source })
   } catch (err) {
@@ -315,7 +338,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   if (msg.type === 'init') {
     if (initStarted) return
     initStarted = true
-    void init()
+    void init(msg.backend === 'wasm' ? 'wasm' : 'webgpu')
     return
   }
   if (msg.type === 'cancel') {
