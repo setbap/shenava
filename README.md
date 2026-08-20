@@ -8,6 +8,19 @@
 
 ## اسکرین‌شات
 
+<table>
+  <tr>
+    <td align="center" valign="top">
+      <p><strong>Desktop</strong></p>
+      <img src="docs/screenshot-desktop.png" alt="Desktop" width="720" />
+    </td>
+    <td align="center" valign="top">
+      <p><strong>Mobile</strong></p>
+      <img src="docs/screenshot-mobile.png" alt="Mobile" width="280" />
+    </td>
+  </tr>
+</table>
+
 ## توسعه رو سیستم خودت
 
 با دستور های زیر میتونی پکیج ها رو نصب کنی و سایت رو حالت دولوپمنت بالا بیاری.
