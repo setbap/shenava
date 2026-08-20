@@ -51,17 +51,37 @@ export default defineConfig({
         'pwa-192.png',
         'pwa-512.png',
         'og.png',
+        'screenshots/desktop.png',
+        'screenshots/mobile.png',
       ],
       manifest: {
         name: 'شنوا کوچیک',
         short_name: 'شنوا کوچیک',
-        description: 'یادداشت صوتی فارسی که تو مرورگر و حتی آفلاین کار می‌کنه',
+        description:
+          'یادداشت صوتی فارسی. حرف بزن یا فایل بذار، متنش همون‌جا تو مرورگر نوشته می‌شه. آفلاین هم کار می‌کنه و صدا از دستگاهت بیرون نمی‌ره.',
         lang: 'fa',
         dir: 'rtl',
+        categories: ['utilities', 'productivity'],
         theme_color: '#09090b',
         background_color: '#09090b',
         display: 'standalone',
         start_url: '/',
+        screenshots: [
+          {
+            src: '/screenshots/desktop.png',
+            sizes: '1024x863',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'صفحه اصلی روی دسکتاپ',
+          },
+          {
+            src: '/screenshots/mobile.png',
+            sizes: '540x1024',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'صفحه اصلی روی موبایل',
+          },
+        ],
         icons: [
           {
             src: '/pwa-192.png',
