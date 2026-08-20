@@ -150,6 +150,8 @@
 
   html {
     @apply font-sans;
+    color-scheme: dark;
+    background-color: #09090b;
     height: 100%;
     overflow: hidden;
     overscroll-behavior: none;
