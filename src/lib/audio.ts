@@ -109,6 +109,32 @@ function frameRms(frame: Float32Array): number {
   return Math.sqrt(sum / frame.length)
 }
 
+const RECORDER_WORKLET = `
+class PcmCaptureProcessor extends AudioWorkletProcessor {
+  process(inputs) {
+    const channel = inputs[0] && inputs[0][0]
+    if (channel && channel.length > 0) {
+      this.port.postMessage(channel.slice())
+    }
+    return true
+  }
+}
+registerProcessor('pcm-capture', PcmCaptureProcessor)
+`
+
+async function addRecorderWorklet(context: AudioContext): Promise<void> {
+  const blob = new Blob([RECORDER_WORKLET], { type: 'application/javascript' })
+  const blobUrl = URL.createObjectURL(blob)
+  try {
+    await context.audioWorklet.addModule(blobUrl)
+  } catch {
+    const dataUrl = `data:application/javascript,${encodeURIComponent(RECORDER_WORKLET)}`
+    await context.audioWorklet.addModule(dataUrl)
+  } finally {
+    URL.revokeObjectURL(blobUrl)
+  }
+}
+
 export class MicCapture {
   private context: AudioContext | null = null
   private stream: MediaStream | null = null
@@ -125,6 +151,8 @@ export class MicCapture {
     this.chunks = []
     this.captured = 0
     this.smoothed = 0
+    const context = new AudioContext()
+    this.context = context
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
@@ -133,12 +161,11 @@ export class MicCapture {
       },
       video: false,
     })
-    this.context = new AudioContext()
-    const workletUrl = new URL('../audio/recorder-worklet.ts', import.meta.url)
-    await this.context.audioWorklet.addModule(workletUrl)
-    this.source = this.context.createMediaStreamSource(this.stream)
-    this.node = new AudioWorkletNode(this.context, 'pcm-capture')
-    this.mute = this.context.createGain()
+    if (context.state === 'suspended') await context.resume()
+    await addRecorderWorklet(context)
+    this.source = context.createMediaStreamSource(this.stream)
+    this.node = new AudioWorkletNode(context, 'pcm-capture')
+    this.mute = context.createGain()
     this.mute.gain.value = 0
     this.node.port.onmessage = (event: MessageEvent<Float32Array>) => {
       const frame = event.data
@@ -154,7 +181,7 @@ export class MicCapture {
     }
     this.source.connect(this.node)
     this.node.connect(this.mute)
-    this.mute.connect(this.context.destination)
+    this.mute.connect(context.destination)
   }
 
   sampleRate(): number {

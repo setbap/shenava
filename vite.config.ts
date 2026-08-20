@@ -11,6 +11,7 @@ const root = path.dirname(fileURLToPath(import.meta.url))
 const isolation = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Embedder-Policy': 'credentialless',
+  'Cross-Origin-Resource-Policy': 'same-origin',
 }
 
 const ORT_FILES = [
