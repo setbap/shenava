@@ -140,14 +140,9 @@ function configureOrt(): void {
   ort.env.wasm.numThreads = self.crossOriginIsolated ? 4 : 1
 }
 
-function timeout(ms: number, message: string): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(message)), ms)
-  })
-}
-
 async function createSession(
   model: Uint8Array,
+  wasmOnly: boolean,
 ): Promise<{ session: ort.InferenceSession; backend: AsrBackend }> {
   configureOrt()
 
@@ -158,22 +153,12 @@ async function createSession(
   }, 1500)
 
   try {
-    post({ type: 'progress', phase: 'compile', percent: 5 })
-    try {
-      const created = await Promise.race([
-        ort.InferenceSession.create(model, { executionProviders: ['webgpu'] }),
-        timeout(20_000, 'WebGPU timeout'),
-      ])
-      post({ type: 'progress', phase: 'compile', percent: 100 })
-      return { session: created, backend: 'webgpu' }
-    } catch {
-      post({ type: 'progress', phase: 'compile', percent: 20 })
-      const created = await ort.InferenceSession.create(model, {
-        executionProviders: ['wasm'],
-      })
-      post({ type: 'progress', phase: 'compile', percent: 100 })
-      return { session: created, backend: 'wasm' }
-    }
+    post({ type: 'progress', phase: 'compile', percent: wasmOnly ? 20 : 5 })
+    const created = await ort.InferenceSession.create(model, {
+      executionProviders: wasmOnly ? ['wasm'] : ['webgpu', 'wasm'],
+    })
+    post({ type: 'progress', phase: 'compile', percent: 100 })
+    return { session: created, backend: wasmOnly ? 'wasm' : 'webgpu' }
   } finally {
     clearInterval(beat)
   }
@@ -301,7 +286,7 @@ async function runQueued(): Promise<void> {
   }
 }
 
-async function init(): Promise<void> {
+async function init(wasmOnly: boolean): Promise<void> {
   try {
     const [tok, mel, model] = await Promise.all([
       fetchJson<TokenTable>(MODEL_FILES.tokens),
@@ -310,7 +295,7 @@ async function init(): Promise<void> {
     ])
     tokens = tok
     melFilters = mel
-    const created = await createSession(model.bytes)
+    const created = await createSession(model.bytes, wasmOnly)
     session = created.session
     post({ type: 'ready', backend: created.backend, source: model.source })
   } catch (err) {
@@ -326,7 +311,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   if (msg.type === 'init') {
     if (session || initInFlight) return
     initInFlight = true
-    void init().finally(() => {
+    void init(Boolean(msg.wasmOnly)).finally(() => {
       initInFlight = false
     })
     return
