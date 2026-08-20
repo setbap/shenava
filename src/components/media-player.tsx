@@ -25,7 +25,7 @@ export function MediaPlayer({
   seekRequest: number | null
   seekNonce: number
 }) {
-  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null)
+  const mediaRef = useRef<HTMLMediaElement | null>(null)
   const onTimeRef = useRef(onTime)
   const lastAudibleVolume = useRef(1)
   const [playing, setPlaying] = useState(false)
@@ -136,13 +136,21 @@ export function MediaPlayer({
     <div className="flex flex-col bg-card/40">
       {video ? (
         <video
-          ref={mediaRef}
+          ref={(el) => {
+            mediaRef.current = el
+          }}
           src={src}
           className="mx-auto max-h-56 w-full rounded-lg bg-black"
           playsInline
         />
       ) : (
-        <audio ref={mediaRef} src={src} className="hidden" />
+        <audio
+          ref={(el) => {
+            mediaRef.current = el
+          }}
+          src={src}
+          className="hidden"
+        />
       )}
       <div dir="ltr" className="flex h-16 items-center gap-3 border-t px-4 select-none">
         <Popover>

@@ -1,0 +1,7 @@
+.vercel
+.env*.local
+*.onnx
+*.onnx.data
+*.wasm
+public/ort
+public/icon.png

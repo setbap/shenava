@@ -34,3 +34,4 @@ public/ort/*.wasm
 
 # Vercel
 .vercel
+.env*
