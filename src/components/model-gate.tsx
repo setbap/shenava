@@ -37,38 +37,33 @@ export function ModelGate({
       : null
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="model-setup-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-blue-600 px-6 text-white"
-    >
-      <div className="flex w-full max-w-md flex-col items-center gap-5 text-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6 backdrop-blur-md">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="model-setup-title"
+        className="flex w-full max-w-md flex-col gap-4 rounded-xl bg-popover p-6 text-popover-foreground ring-1 ring-foreground/10"
+      >
         {load.status === 'checking' || (load.status === 'loading' && !prompted) ? (
           <>
-            <h1 id="model-setup-title" className="text-2xl font-medium">
+            <h1 id="model-setup-title" className="font-heading text-lg font-medium">
               شنوا کوچیک
             </h1>
-            <p className="text-white/85">یک لحظه، داره آماده می‌شه…</p>
+            <p className="leading-7 text-muted-foreground">یک لحظه، داره آماده می‌شه…</p>
           </>
         ) : null}
 
         {load.status === 'needed' ? (
           <>
-            <h1 id="model-setup-title" className="text-2xl font-medium">
+            <h1 id="model-setup-title" className="font-heading text-lg font-medium">
               خوش اومدی
             </h1>
-            <p className="text-pretty leading-8 text-white/90">
+            <p className="text-pretty leading-8 text-muted-foreground">
               برای این‌که بتونی حرف بزنی و متنش رو ببینی، باید مدل شنوا کوچیک رو روی همین
               دستگاه دانلود کنی. حدود ۲۲۰ مگ حجمشه؛ یه‌بار که اومد، آفلاین هم کار می‌کنه و
               صدات از دستگاهت بیرون نمی‌ره.
             </p>
-            <Button
-              type="button"
-              size="lg"
-              className="h-11 min-h-11 bg-white px-6 text-base text-blue-700 hover:bg-white/90"
-              onClick={onDownload}
-            >
+            <Button type="button" size="lg" className="h-11 min-h-11 text-base" onClick={onDownload}>
               <DownloadIcon data-icon="inline-start" />
               دانلود مدل
             </Button>
@@ -77,22 +72,22 @@ export function ModelGate({
 
         {load.status === 'loading' && prompted ? (
           <>
-            <h1 id="model-setup-title" className="text-2xl font-medium">
+            <h1 id="model-setup-title" className="font-heading text-lg font-medium">
               {load.phase === 'compile' ? 'داره آماده می‌شه' : 'داره دانلود می‌شه'}
             </h1>
-            <p className="text-pretty leading-8 text-white/90">
+            <p className="text-pretty leading-8 text-muted-foreground">
               {load.phase === 'compile'
                 ? 'چند لحظه دیگه موتور روی دستگاهت بالا میاد.'
                 : 'یه کم طول می‌کشه، ولی فقط همین یه‌باره. حدود ۲۲۰ مگ حجمشه.'}
             </p>
             <div className="flex w-full flex-col gap-2">
-              <div className="flex items-center justify-between text-sm text-white/85">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>{downloaded ?? (load.phase === 'compile' ? 'آماده‌سازی' : 'دانلود مدل')}</span>
                 <span className="tabular-nums">{formatFaNumber(Math.round(percent))}٪</span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-white/25">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-white transition-[width] duration-200"
+                  className="h-full rounded-full bg-primary transition-[width] duration-200"
                   style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
                 />
               </div>
@@ -102,20 +97,15 @@ export function ModelGate({
 
         {load.status === 'error' ? (
           <>
-            <h1 id="model-setup-title" className="text-2xl font-medium">
+            <h1 id="model-setup-title" className="font-heading text-lg font-medium">
               دانلود نشد
             </h1>
-            <p className="text-pretty leading-8 text-white/90">{load.message}</p>
-            <p className="text-pretty text-sm leading-7 text-white/80">
+            <p className="text-pretty leading-8 text-muted-foreground">{load.message}</p>
+            <p className="text-pretty text-sm leading-7 text-muted-foreground">
               اینترنتت رو چک کن و دوباره امتحان کن. مدل حدود ۲۲۰ مگه و باید روی دستگاهت
               بمونه.
             </p>
-            <Button
-              type="button"
-              size="lg"
-              className="h-11 min-h-11 bg-white px-6 text-base text-blue-700 hover:bg-white/90"
-              onClick={onDownload}
-            >
+            <Button type="button" size="lg" className="h-11 min-h-11 text-base" onClick={onDownload}>
               تلاش دوباره
             </Button>
           </>
