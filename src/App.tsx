@@ -86,7 +86,7 @@ export default function App() {
   return (
     <Direction.Provider dir="rtl">
       <TooltipProvider>
-        <div className="flex h-svh overflow-hidden">
+        <div className="flex h-full overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           <AppShell />
           <Toaster theme="dark" dir="rtl" position="top-center" />
         </div>
