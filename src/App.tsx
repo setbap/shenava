@@ -3,7 +3,7 @@ import { Direction } from 'radix-ui'
 import { toast } from 'sonner'
 import { AppSidebar, NoteSearchDialog } from '@/components/app-sidebar'
 import { ComposePanel } from '@/components/compose-panel'
-import type { LoadState } from '@/components/model-gate'
+import { ModelGate, type LoadState } from '@/components/model-gate'
 import { NotePanel } from '@/components/note-panel'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,6 +37,7 @@ import {
   SAMPLE_RATE,
   WINDOW_SAMPLES,
 } from '@/lib/constants'
+import { isModelCached } from '@/lib/model-cache'
 import {
   deleteNote,
   getNote,
@@ -102,11 +103,9 @@ function AppShell() {
   const transcribingRef = useRef(false)
   const mediaObjectUrl = useRef<string | null>(null)
 
-  const [load, setLoad] = useState<LoadState>({
-    status: 'loading',
-    phase: 'download',
-    percent: 0,
-  })
+  const initStarted = useRef(false)
+  const [prompted, setPrompted] = useState(false)
+  const [load, setLoad] = useState<LoadState>({ status: 'checking' })
   const [downloadBytes, setDownloadBytes] = useState<{ loaded: number; total: number } | null>(
     null,
   )
@@ -131,6 +130,14 @@ function AppShell() {
     setMediaUrl(url)
   }, [])
 
+  const startModelLoad = useCallback((fromPrompt = false) => {
+    if (initStarted.current) return
+    initStarted.current = true
+    if (fromPrompt) setPrompted(true)
+    setLoad({ status: 'loading', phase: 'download', percent: 0 })
+    clientRef.current?.init()
+  }, [])
+
   useEffect(() => {
     const client = new AsrClient()
     clientRef.current = client
@@ -149,17 +156,24 @@ function AppShell() {
       void requestPersistentStorage()
     }
     client.onError = (message) => {
+      initStarted.current = false
       setLoad({ status: 'error', message })
     }
-    client.init()
+    let cancelled = false
+    void isModelCached().then((cached) => {
+      if (cancelled) return
+      if (cached) startModelLoad()
+      else setLoad({ status: 'needed' })
+    })
     void listNotes().then(setNotes)
     return () => {
+      cancelled = true
       if (timerRef.current) window.clearInterval(timerRef.current)
       void micRef.current?.stop()
       client.dispose()
       if (mediaObjectUrl.current) URL.revokeObjectURL(mediaObjectUrl.current)
     }
-  }, [])
+  }, [startModelLoad])
 
   const ready = load.status === 'ready'
 
@@ -446,8 +460,6 @@ function AppShell() {
     ) : (
       <ComposePanel
         ready={ready}
-        load={load}
-        downloadBytes={downloadBytes}
         recording={recording}
         voiceLevel={voiceLevel}
         busy={busy}
@@ -472,6 +484,7 @@ function AppShell() {
 
   if (isMobile) {
     return (
+      <>
       <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-12 items-center justify-between gap-2 border-b px-3">
           <div className="flex items-center gap-2">
@@ -505,6 +518,13 @@ function AppShell() {
         {workspace}
         {searchDialog}
       </div>
+      <ModelGate
+        load={load}
+        downloadBytes={downloadBytes}
+        prompted={prompted}
+        onDownload={() => startModelLoad(true)}
+      />
+    </>
     )
   }
 
@@ -544,6 +564,12 @@ function AppShell() {
       </ResizablePanel>
     </ResizablePanelGroup>
     {searchDialog}
+    <ModelGate
+      load={load}
+      downloadBytes={downloadBytes}
+      prompted={prompted}
+      onDownload={() => startModelLoad(true)}
+    />
     </>
   )
 }

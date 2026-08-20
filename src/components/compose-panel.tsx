@@ -3,7 +3,6 @@ import { CircleIcon, UploadIcon } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
-import { ModelGate, type LoadState } from '@/components/model-gate'
 import { TranscriptView } from '@/components/transcript-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
@@ -92,8 +91,6 @@ function RecordButton({
 
 export function ComposePanel({
   ready,
-  load,
-  downloadBytes,
   recording,
   voiceLevel,
   busy,
@@ -106,8 +103,6 @@ export function ComposePanel({
   onCancel,
 }: {
   ready: boolean
-  load: LoadState
-  downloadBytes: { loaded: number; total: number } | null
   recording: boolean
   voiceLevel: number
   busy: boolean
@@ -128,9 +123,6 @@ export function ComposePanel({
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex min-h-full flex-col items-center justify-center gap-6 px-6 py-10">
-          {load.status !== 'ready' ? (
-            <ModelGate load={load} downloadBytes={downloadBytes} />
-          ) : null}
           {notice ? <p className="text-sm text-destructive">{notice}</p> : null}
           {job === 'caption' ? (
             <div className="flex w-full max-w-md flex-col gap-2">
