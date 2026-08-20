@@ -25,26 +25,29 @@ type Pending = {
   onCaptionProgress?: (info: CaptionProgress) => void
 }
 
-function isWasmDoubleInit(message: string): boolean {
-  return /initWasm|no available backend/i.test(message)
-}
-
 export class AsrClient {
   private worker: Worker
   private nextId = 1
   private pending = new Map<number, Pending>()
-  private wasmFallbackUsed = false
 
   onProgress: ((info: ProgressInfo) => void) | null = null
   onReady: ((backend: AsrBackend, source: ModelSource) => void) | null = null
   onError: ((message: string) => void) | null = null
 
   constructor() {
-    this.worker = this.spawn()
+    this.worker = new Worker(new URL('../workers/asr.worker.ts', import.meta.url), {
+      type: 'module',
+    })
+    this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      this.handle(event.data)
+    }
+    this.worker.onerror = (event) => {
+      this.onError?.(event.message || 'Worker failed')
+    }
   }
 
-  init(wasmOnly = false): void {
-    const msg: WorkerRequest = { type: 'init', wasmOnly }
+  init(): void {
+    const msg: WorkerRequest = { type: 'init' }
     this.worker.postMessage(msg)
   }
 
@@ -84,39 +87,6 @@ export class AsrClient {
     this.worker.terminate()
   }
 
-  private spawn(): Worker {
-    const worker = new Worker(new URL('../workers/asr.worker.ts', import.meta.url), {
-      type: 'module',
-    })
-    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      this.handle(event.data)
-    }
-    worker.onerror = (event) => {
-      this.fail(event.message || 'Worker failed')
-    }
-    return worker
-  }
-
-  private retryWasmOnly(): void {
-    this.wasmFallbackUsed = true
-    this.worker.terminate()
-    this.worker = this.spawn()
-    this.onProgress?.({ phase: 'compile', percent: 20 })
-    this.init(true)
-  }
-
-  private fail(message: string): void {
-    if (!this.wasmFallbackUsed && isWasmDoubleInit(message)) {
-      this.retryWasmOnly()
-      return
-    }
-    this.onError?.(
-      isWasmDoubleInit(message)
-        ? 'موتور روی این صفحه قفل شد. یک‌بار رفرش کن و دوباره امتحان کن.'
-        : message,
-    )
-  }
-
   private handle(msg: WorkerResponse): void {
     if (msg.type === 'progress') {
       this.onProgress?.({
@@ -150,7 +120,7 @@ export class AsrClient {
         this.pending.delete(msg.id)
         return
       }
-      this.fail(msg.message)
+      this.onError?.(msg.message)
     }
   }
 }
